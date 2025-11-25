@@ -95,15 +95,21 @@ export function useAuth(): UseAuthReturn {
   };
 
   const handleGoogleLogin = async () => {
+    clearError();
     try {
-      await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/dashboard`,
         },
       });
+      
+      if (error) {
+        setError(error.message);
+        console.error("Error with Google login:", error);
+      }
     } catch (error: any) {
-      setError(error.message);
+      setError(error.message || "Failed to initiate Google sign-in. Please check your Google OAuth configuration.");
       console.error("Error with Google login:", error);
     }
   };
