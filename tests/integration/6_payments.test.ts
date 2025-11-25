@@ -80,7 +80,7 @@ describe("Suite 6: Stripe Payments Integration", () => {
   beforeAll(async () => {
     testUser = await getOrCreateTestUser(TEST_USER_GREG);
 
-    // Get the corresponding Stripe customer ID.
+    // Get the corresponding profile
     const { data: profile } = await supabaseServiceClient
       .from("profiles")
       .select("stripe_customer_id")
@@ -91,8 +91,28 @@ describe("Suite 6: Stripe Payments Integration", () => {
       throw new Error("No profile found");
     }
 
-    customerId = profile.stripe_customer_id;
-    console.log(`🔒 Created User with Stripe Customer ID: ${customerId}`);
+    // Create Stripe customer if it doesn't exist
+    if (!profile.stripe_customer_id) {
+      const customer = await stripe.customers.create({
+        email: testUser.email,
+        metadata: {
+          user_id: testUser.id!,
+        },
+      });
+      customerId = customer.id;
+      
+      // Update profile with Stripe customer ID
+      await supabaseServiceClient
+        .from("profiles")
+        .update({ stripe_customer_id: customerId })
+        .eq("user_id", testUser.id);
+      
+      console.log(`🔒 Created Stripe Customer: ${customerId}`);
+    } else {
+      customerId = profile.stripe_customer_id;
+      console.log(`🔒 Using existing Stripe Customer ID: ${customerId}`);
+    }
+    
     await createPaymentMethod();
   }, 15_000);
 
@@ -110,12 +130,13 @@ describe("Suite 6: Stripe Payments Integration", () => {
     const subscription = await createSubscription();
 
     // Simulate checkout.session.completed webhook
+    // Note: checkout.session.completed event has 'customer' field, not 'subscription'
     const event = {
       type: "checkout.session.completed",
       data: {
         object: {
-          subscription: subscription.id,
           customer: customerId,
+          subscription: subscription.id,
         },
       },
     };
@@ -125,13 +146,13 @@ describe("Suite 6: Stripe Payments Integration", () => {
     expect(response.status).toBe(200);
 
     // Verify database update
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseServiceClient
       .from("profiles")
       .select()
       .eq("stripe_customer_id", customerId)
       .single();
 
-    expect(profile.subscription_plan).toBe("premium");
+    expect(profile?.subscription_plan).toBe("premium");
   }, 30_000);
 
   test("deleted subscription updates user to free", async () => {
@@ -159,13 +180,13 @@ describe("Suite 6: Stripe Payments Integration", () => {
     expect(response.status).toBe(200);
 
     // Verify database update
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseServiceClient
       .from("profiles")
       .select()
       .eq("stripe_customer_id", customerId)
       .single();
 
-    expect(profile.subscription_plan).toBe("free");
-    expect(profile.tasks_limit).toBe(TASK_LIMITS.FREE_TIER);
+    expect(profile?.subscription_plan).toBe("free");
+    expect(profile?.tasks_limit).toBe(TASK_LIMITS.FREE_TIER);
   }, 30_000);
 });

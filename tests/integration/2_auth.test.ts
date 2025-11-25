@@ -48,22 +48,27 @@ describe("Suite 2: Test Auth Use Cases", () => {
     const taskId = task.task_id;
 
     // Try reading the task as Charlie.
-    await supabase.auth.signInWithPassword({
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: TEST_USER_CHARLIE.email,
       password: TEST_USER_CHARLIE.password,
     });
+    
+    expect(signInError).toBeFalsy();
+    expect(signInData.session).toBeTruthy();
+
+    // Small delay to ensure session is established
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     const { error: readError, data: readData } = await supabase
       .from("tasks")
       .select("*")
       .eq("task_id", taskId);
+    expect(readError).toBeFalsy();
     expect(readData).toHaveLength(0);
   }, 15_000);
 
   test("can get jwt auth token for logged in user", async () => {
-    // Ensure the test user exists
-    await getOrCreateTestUser(TEST_USER_BOB);
-
+    // Use the test user created in beforeAll
     const { data, error } = await supabaseServiceClient.auth.signInWithPassword(
       {
         email: TEST_USER_BOB.email,

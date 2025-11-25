@@ -58,10 +58,12 @@ describe("Suite 3: Storage (Task Image Attachments)", () => {
   }
 
   test("can attach image to a task", async () => {
-    const { data: taskData } = await createTask(
+    const { data: taskData, error: createError } = await createTask(
       testUserDavid,
       "Test Task with Image"
     );
+    expect(createError).toBeFalsy();
+    expect(taskData).toBeTruthy();
     const task = taskData![0];
     expect(task).toBeTruthy();
 
@@ -110,18 +112,26 @@ describe("Suite 3: Storage (Task Image Attachments)", () => {
 
   test("cannot attach image to other user's task", async () => {
     // Create a task as the original test user
-    const { data: taskData } = await createTask(
+    const { data: taskData, error: createError } = await createTask(
       testUserDavid,
       "Test Task for Image Security"
     );
+    expect(createError).toBeFalsy();
+    expect(taskData).toBeTruthy();
     const task = taskData![0];
     expect(task).toBeTruthy();
 
     // Log in as Dominic.
-    await supabase.auth.signInWithPassword({
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: TEST_USER_DOMINIC.email,
       password: TEST_USER_DOMINIC.password,
     });
+    
+    expect(signInError).toBeFalsy();
+    expect(signInData.session).toBeTruthy();
+
+    // Small delay to ensure session is established
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Now try to upload an image to David's task path.
     const { storagePath, uploadError } = await uploadTaskImage(
