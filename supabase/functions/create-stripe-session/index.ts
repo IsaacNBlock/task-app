@@ -49,10 +49,10 @@ Deno.serve(async (req) => {
 
     console.log(`🔎 Looking for user_id ${user.id}`);
 
-    // First try to get the profile
+    // Get the profile
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("stripe_customer_id, subscription_plan")
+      .select("stripe_customer_id, subscription_plan, name")
       .eq("user_id", user.id)
       .single();
 
@@ -66,8 +66,33 @@ Deno.serve(async (req) => {
     }
 
     console.log(`🔎 Found profile: ${profile}`);
-    if (!profile?.stripe_customer_id) {
-      throw new Error("No Stripe customer found");
+
+    // Create Stripe customer if it doesn't exist
+    let stripeCustomerId = profile.stripe_customer_id;
+    if (!stripeCustomerId) {
+      console.log("📝 Creating new Stripe customer...");
+      
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: profile.name || undefined,
+        metadata: {
+          user_id: user.id,
+        },
+      });
+
+      stripeCustomerId = customer.id;
+      console.log(`✅ Created Stripe customer: ${stripeCustomerId}`);
+
+      // Update profile with the new Stripe customer ID
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ stripe_customer_id: stripeCustomerId })
+        .eq("user_id", user.id);
+
+      if (updateError) {
+        console.error("Failed to update profile with Stripe customer ID:", updateError);
+        throw new Error("Failed to save Stripe customer ID");
+      }
     }
 
     const originUrl = req.headers.get("origin") ?? "http://localhost:3000";
@@ -75,7 +100,7 @@ Deno.serve(async (req) => {
     // Create Portal session if already subscribed
     if (profile.subscription_plan === "premium") {
       const session = await stripe.billingPortal.sessions.create({
-        customer: profile.stripe_customer_id,
+        customer: stripeCustomerId,
         return_url: `${originUrl}/profile`,
       });
       return new Response(JSON.stringify({ url: session.url }), {
@@ -83,9 +108,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Validate STRIPE_PRICE_ID is set
+    if (!STRIPE_PRICE_ID) {
+      throw new Error(
+        "STRIPE_PRICE_ID is not configured. Please set it as a Supabase secret using: supabase secrets set STRIPE_PRICE_ID=price_xxx"
+      );
+    }
+
     // Create Checkout session for new subscribers
     const session = await stripe.checkout.sessions.create({
-      customer: profile.stripe_customer_id,
+      customer: stripeCustomerId,
       line_items: [
         {
           price: STRIPE_PRICE_ID,

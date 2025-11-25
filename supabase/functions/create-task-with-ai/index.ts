@@ -108,9 +108,17 @@ Deno.serve(async (req) => {
           }
         }
       }
-    } catch (aiError) {
+    } catch (aiError: any) {
       // Log the error but don't fail the request - task was already created
-      console.error("Error getting AI label suggestion:", aiError);
+      const errorMessage = aiError?.message || "Unknown AI error";
+      const statusCode = aiError?.status || aiError?.response?.status;
+      
+      if (statusCode === 429) {
+        console.warn("⚠️ OpenAI quota exceeded. Task created without AI label.");
+      } else {
+        console.error("Error getting AI label suggestion:", errorMessage);
+      }
+      // Task will be returned without label - this is fine
     }
 
     // Return the task (with or without label)
