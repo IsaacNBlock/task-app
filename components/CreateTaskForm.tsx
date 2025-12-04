@@ -13,6 +13,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface TaskSuggestions {
   priorityLevel: number;
@@ -28,6 +35,7 @@ interface CreateTaskFormProps {
 export function CreateTaskForm({ onSubmit }: CreateTaskFormProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [priorityLevel, setPriorityLevel] = useState<number | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [suggestions, setSuggestions] = useState<TaskSuggestions | null>(null);
@@ -39,10 +47,12 @@ export function CreateTaskForm({ onSubmit }: CreateTaskFormProps) {
     setError(null);
     setIsSubmitting(true);
     try {
-      const priorityLevel = suggestions?.priorityLevel;
-      await onSubmit(title, description, priorityLevel);
+      // Use manually selected priority or AI-suggested priority
+      const finalPriority = priorityLevel !== undefined ? priorityLevel : suggestions?.priorityLevel;
+      await onSubmit(title, description, finalPriority);
       setTitle("");
       setDescription("");
+      setPriorityLevel(undefined);
       setSuggestions(null);
       setShowSuggestions(false);
     } catch (err) {
@@ -94,6 +104,10 @@ export function CreateTaskForm({ onSubmit }: CreateTaskFormProps) {
       const suggestionsData = await response.json();
       setSuggestions(suggestionsData);
       setShowSuggestions(true);
+      // Auto-populate priority if not already set
+      if (priorityLevel === undefined && suggestionsData.priorityLevel) {
+        setPriorityLevel(suggestionsData.priorityLevel);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to get suggestions");
     } finally {
@@ -131,6 +145,27 @@ export function CreateTaskForm({ onSubmit }: CreateTaskFormProps) {
             placeholder="Enter task description"
             rows={3}
           />
+        </div>
+        <div>
+          <Label htmlFor="priority">Priority Level</Label>
+          <Select
+            value={priorityLevel?.toString() || ""}
+            onValueChange={(value) => setPriorityLevel(value ? parseInt(value) : undefined)}
+          >
+            <SelectTrigger id="priority" className="w-full">
+              <SelectValue placeholder="Select priority (optional)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1 - Lowest</SelectItem>
+              <SelectItem value="2">2 - Low</SelectItem>
+              <SelectItem value="3">3 - Medium</SelectItem>
+              <SelectItem value="4">4 - High</SelectItem>
+              <SelectItem value="5">5 - Highest</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-1">
+            Optional: Select a priority level or use AI suggestions
+          </p>
         </div>
         <div className="flex gap-2">
           <Button
