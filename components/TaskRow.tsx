@@ -19,8 +19,8 @@ const TaskRow = ({ task, onDelete, onToggleComplete }: TaskRowProps) => {
   };
 
   return (
-    <TableRow className="hover:bg-muted/50">
-      <TableCell className="py-2">
+    <TableRow className="hover:bg-muted/70 transition-colors duration-150">
+      <TableCell className="py-4">
         <Checkbox
           checked={task.completed!}
           onCheckedChange={(checked) =>
@@ -28,15 +28,15 @@ const TaskRow = ({ task, onDelete, onToggleComplete }: TaskRowProps) => {
           }
         />
       </TableCell>
-      <TableCell className="py-2">
+      <TableCell className="py-4">
         <Link
           href={`/task?id=${task.task_id}`}
-          className="hover:underline font-medium"
+          className="hover:underline font-medium text-gray-900 dark:text-gray-100 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
         >
           {task.title}
         </Link>
       </TableCell>
-      <TableCell className="py-2">
+      <TableCell className="py-4">
         {task.label && (
           <Badge
             variant="outline"
@@ -44,16 +44,17 @@ const TaskRow = ({ task, onDelete, onToggleComplete }: TaskRowProps) => {
               getLabelColors(task.label)["bg-color"],
               getLabelColors(task.label)["text-color"],
               getLabelColors(task.label)["border-color"],
+              "shadow-sm"
             ].join(" ")}
           >
             {task.label}
           </Badge>
         )}
       </TableCell>
-      <TableCell className="py-2 whitespace-nowrap">
+      <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground">
         {task.due_date ? formatDate(task.due_date) : ""}
       </TableCell>
-      <TableCell className="text-right py-2">
+      <TableCell className="text-right py-4">
         <Button variant="ghost" size="icon" asChild className="h-8 w-8">
           <Link href={`/task?id=${task.task_id}`}>
             <Edit className="h-4 w-4" />

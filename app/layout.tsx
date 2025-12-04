@@ -18,13 +18,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.className} bg-gradient-to-br from-blue-600 to-violet-600 min-h-screen`}
+        className={`${inter.className} bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 min-h-screen`}
       >
         <div className="flex flex-col min-h-screen">
           <Header />
           <main className="flex-grow container mx-auto px-4 py-8">
-            <Card className="w-full max-w-2xl mx-auto">
-              <CardContent className="p-6">
+            <Card className="w-full max-w-2xl mx-auto shadow-2xl border-0 backdrop-blur-sm bg-white/95 dark:bg-gray-900/95 transition-all duration-300 hover:shadow-3xl">
+              <CardContent className="p-8">
                 <RouteGuard>{children}</RouteGuard>
               </CardContent>
             </Card>

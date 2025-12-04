@@ -59,7 +59,13 @@ Deno.serve(async (req) => {
     // Try to get AI label suggestion, but don't fail if it errors
     let label = null;
     try {
-      if (OPENAI_API_KEY) {
+      // Check if OpenAI API key is configured
+      if (!OPENAI_API_KEY || OPENAI_API_KEY.trim() === "") {
+        console.warn("⚠️ OPENAI_API_KEY is not set. Task created without AI label.");
+        console.log("💡 To enable AI labels, set the secret: supabase secrets set OPENAI_API_KEY=sk-...");
+      } else {
+        console.log("🔑 OpenAI API key found, generating label...");
+        
         // Initialize OpenAI
         const openai = new OpenAI({
           apiKey: OPENAI_API_KEY,
@@ -68,6 +74,7 @@ Deno.serve(async (req) => {
         // Get label suggestion from OpenAI
         const prompt = `Based on this task title: "${title}" and description: "${description}", suggest ONE of these labels: work, personal, priority, shopping, home. Reply with just the label word and nothing else.`;
 
+        console.log("📤 Sending request to OpenAI...");
         const completion = await openai.chat.completions.create({
           messages: [{ role: "user", content: prompt }],
           model: "gpt-4o-mini",
@@ -75,36 +82,60 @@ Deno.serve(async (req) => {
           max_tokens: 16,
         });
 
-        const suggestedLabel = completion.choices[0].message.content
-          ?.toLowerCase()
-          .trim();
+        const rawResponse = completion.choices[0]?.message?.content;
+        console.log(`📥 OpenAI raw response: "${rawResponse}"`);
 
-        console.log(`✨ AI Suggested Label: ${suggestedLabel}`);
+        if (!rawResponse) {
+          console.warn("⚠️ OpenAI returned empty response");
+        } else {
+          // Clean the response - remove punctuation, extra whitespace, and extract just the label
+          let suggestedLabel = rawResponse.toLowerCase().trim();
+          // Remove common punctuation and extra words
+          suggestedLabel = suggestedLabel
+            .replace(/^[^a-z]*/, "") // Remove leading non-letters
+            .replace(/[^a-z]*$/, "") // Remove trailing non-letters
+            .replace(/\s+/g, " ") // Normalize whitespace
+            .trim();
+          
+          // Try to find a valid label in the response (in case OpenAI added extra text)
+          const validLabels = ["work", "personal", "priority", "shopping", "home"];
+          label = validLabels.find(l => suggestedLabel.includes(l)) || null;
+          
+          // If no match found, try exact match
+          if (!label && validLabels.includes(suggestedLabel)) {
+            label = suggestedLabel;
+          }
+          
+          console.log(`✨ AI Suggested Label (cleaned): "${suggestedLabel}"`);
 
-        // Validate the label
-        const validLabels = ["work", "personal", "priority", "shopping", "home"];
-        label = validLabels.includes(suggestedLabel) ? suggestedLabel : null;
-
-        // Update the task with the suggested label if we got one
-        if (label) {
-          const { data: updatedTask, error: updateError } = await supabaseClient
-            .from("tasks")
-            .update({ label })
-            .eq("task_id", data.task_id)
-            .select()
-            .single();
-
-          if (updateError) {
-            console.error("Error updating task with label:", updateError);
-            // Don't throw - return the task without the label
+          if (!label) {
+            console.warn(`⚠️ Invalid label "${suggestedLabel}" - not in valid list: ${validLabels.join(", ")}`);
           } else {
-            // Return the updated task with label
-            return new Response(JSON.stringify(updatedTask), {
-              headers: {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-              },
-            });
+            console.log(`✅ Valid label found: "${label}"`);
+          }
+
+          // Update the task with the suggested label if we got one
+          if (label) {
+            const { data: updatedTask, error: updateError } = await supabaseClient
+              .from("tasks")
+              .update({ label })
+              .eq("task_id", data.task_id)
+              .select()
+              .single();
+
+            if (updateError) {
+              console.error("❌ Error updating task with label:", updateError);
+              // Don't throw - return the task without the label
+            } else {
+              console.log(`✅ Task updated with label: "${label}"`);
+              // Return the updated task with label
+              return new Response(JSON.stringify(updatedTask), {
+                headers: {
+                  "Content-Type": "application/json",
+                  "Access-Control-Allow-Origin": "*",
+                },
+              });
+            }
           }
         }
       }
@@ -112,11 +143,24 @@ Deno.serve(async (req) => {
       // Log the error but don't fail the request - task was already created
       const errorMessage = aiError?.message || "Unknown AI error";
       const statusCode = aiError?.status || aiError?.response?.status;
+      const errorCode = aiError?.code || aiError?.response?.data?.error?.code;
       
-      if (statusCode === 429) {
+      console.error("❌ OpenAI API Error Details:", {
+        message: errorMessage,
+        status: statusCode,
+        code: errorCode,
+        type: aiError?.type,
+        fullError: JSON.stringify(aiError, Object.getOwnPropertyNames(aiError)),
+      });
+      
+      if (statusCode === 401 || errorCode === "invalid_api_key") {
+        console.error("🔑 Invalid OpenAI API key. Please check your OPENAI_API_KEY secret.");
+      } else if (statusCode === 429) {
         console.warn("⚠️ OpenAI quota exceeded. Task created without AI label.");
+      } else if (statusCode === 500 || statusCode === 503) {
+        console.warn("⚠️ OpenAI service unavailable. Task created without AI label.");
       } else {
-        console.error("Error getting AI label suggestion:", errorMessage);
+        console.error(`❌ Unexpected OpenAI error (${statusCode}): ${errorMessage}`);
       }
       // Task will be returned without label - this is fine
     }
