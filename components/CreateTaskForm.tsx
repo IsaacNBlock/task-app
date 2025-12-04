@@ -22,7 +22,7 @@ interface TaskSuggestions {
 }
 
 interface CreateTaskFormProps {
-  onSubmit: (title: string, description: string) => Promise<void>;
+  onSubmit: (title: string, description: string, priorityLevel?: number) => Promise<void>;
 }
 
 export function CreateTaskForm({ onSubmit }: CreateTaskFormProps) {
@@ -39,7 +39,8 @@ export function CreateTaskForm({ onSubmit }: CreateTaskFormProps) {
     setError(null);
     setIsSubmitting(true);
     try {
-      await onSubmit(title, description);
+      const priorityLevel = suggestions?.priorityLevel;
+      await onSubmit(title, description, priorityLevel);
       setTitle("");
       setDescription("");
       setSuggestions(null);

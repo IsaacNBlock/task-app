@@ -20,8 +20,8 @@ export default function Dashboard() {
   const { createTask, refreshTasks, tasks, deleteTask, toggleTaskComplete } =
     useTaskManager();
 
-  const handleCreateTask = async (title: string, description: string) => {
-    await createTask(title, description);
+  const handleCreateTask = async (title: string, description: string, priorityLevel?: number) => {
+    await createTask(title, description, priorityLevel);
     await refreshTasks();
     console.log(`New Task Created: ${title}`);
     setIsDialogOpen(false);

@@ -169,7 +169,7 @@ export function useTaskManager(taskId?: string): UseTaskManagerReturn {
     }
   };
 
-  const createTask = async (title: string, description: string) => {
+  const createTask = async (title: string, description: string, priorityLevel?: number) => {
     try {
       const {
         data: { session },
@@ -196,8 +196,25 @@ export function useTaskManager(taskId?: string): UseTaskManagerReturn {
         throw new Error(errorMessage);
       }
 
-      const taskData = await response.json();
+      let taskData = await response.json();
       if (!taskData) throw new Error("No data returned from server");
+
+      // Update task with priority level if provided
+      if (priorityLevel !== undefined && priorityLevel !== null) {
+        const { data: updatedTask, error: updateError } = await supabase
+          .from("tasks")
+          .update({ priority_level: priorityLevel })
+          .eq("task_id", taskData.task_id)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.warn("Failed to update priority level:", updateError);
+          // Don't throw - task was created successfully, just priority update failed
+        } else {
+          taskData = updatedTask;
+        }
+      }
 
       setTasks([taskData, ...tasks]);
       setError(null);

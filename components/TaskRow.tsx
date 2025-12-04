@@ -18,6 +18,20 @@ const TaskRow = ({ task, onDelete, onToggleComplete }: TaskRowProps) => {
     return dateString.split("T")[0];
   };
 
+  const getPriorityBadgeVariant = (priority: number | null) => {
+    if (!priority) return "secondary";
+    if (priority >= 4) return "destructive";
+    if (priority >= 3) return "default";
+    return "secondary";
+  };
+
+  const getPriorityColor = (priority: number | null) => {
+    if (!priority) return "text-gray-400";
+    if (priority >= 4) return "text-red-600 dark:text-red-400";
+    if (priority >= 3) return "text-orange-600 dark:text-orange-400";
+    return "text-gray-600 dark:text-gray-400";
+  };
+
   return (
     <TableRow className="hover:bg-muted/70 transition-colors duration-150">
       <TableCell className="py-4">
@@ -49,6 +63,18 @@ const TaskRow = ({ task, onDelete, onToggleComplete }: TaskRowProps) => {
           >
             {task.label}
           </Badge>
+        )}
+      </TableCell>
+      <TableCell className="py-4">
+        {task.priority_level ? (
+          <Badge
+            variant={getPriorityBadgeVariant(task.priority_level) as any}
+            className={`${getPriorityColor(task.priority_level)} font-semibold`}
+          >
+            {task.priority_level}/5
+          </Badge>
+        ) : (
+          <span className="text-xs text-muted-foreground">-</span>
         )}
       </TableCell>
       <TableCell className="py-4 whitespace-nowrap text-sm text-muted-foreground">
