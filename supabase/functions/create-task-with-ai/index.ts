@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { title, description } = await req.json();
+    const { title, description, priority_level } = await req.json();
 
     console.log("🔄 Creating task with AI suggestions...");
     const authHeader = req.headers.get("Authorization");
@@ -50,6 +50,7 @@ Deno.serve(async (req) => {
         description,
         completed: false,
         user_id: user.id,
+        priority_level: priority_level !== undefined ? priority_level : null,
       })
       .select()
       .single();
